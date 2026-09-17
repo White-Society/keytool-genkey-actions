@@ -1,0 +1,50 @@
+name: Main Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'name project'
+        required: true
+        default: 'main'
+      password:
+        description: 'password'
+        required: true
+        default: '1234567890'  
+
+env:
+  PROJECTNAME: ${{ github.event.inputs.name }}
+  PASSWORD: ${{ github.event.inputs.password }}
+
+jobs:
+  generate-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Original JKS Key File
+        run: |
+          LOW_NAME=$(echo "$PROJECTNAME" | tr '[:upper:]' '[:lower:]')
+          echo "Generating perfect PKCS12 KeyStore for alias: ${LOW_NAME}_key"
+          keytool -genkey -v \
+            -keystore "${LOW_NAME}_release.jks" \
+            -storepass "$PASSWORD" \
+            -alias "${LOW_NAME}_key" \
+            -keypass "$PASSWORD" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storetype PKCS12 \
+            -dname "CN=${LOW_NAME}, O=${LOW_NAME}, C=US"
+          base64 -w 0 "${LOW_NAME}_release.jks" > keystore_base64.txt
+
+      - name: Upload Original JKS Key as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECTNAME }}-bin-key
+          path: |
+            *release.jks
+
+      - name: Upload Encoded Base64 Text as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECTNAME }}-base64-text
+          path: keystore_base64.txt
